@@ -747,13 +747,282 @@ function NewOrderView({ profile }) {
   )
 }
 
+// ── MY DETAIL & EDIT VIEW ─────────────────────────────────
+function MyOrderDetailView({ order, onBack, onSave, onDelete }) {
+  const isEditable = order.status === 'beklemede'
+
+  const [items, setItems] = useState(() => parseItems(order.product_description, order.quantity, order.unit))
+  const [project, setProject] = useState(() => PROJECTS.includes(order.project) ? order.project : 'DİĞER')
+  const [customProj, setCustomProj] = useState(() => PROJECTS.includes(order.project) ? '' : order.project)
+  const [job, setJob] = useState(order.job_description || '')
+  const [urgency, setUrgency] = useState(order.urgency || 'Normal')
+  const [note, setNote] = useState(order.notes || '')
+
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [errFields, setErrFields] = useState({})
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const setItem = (i, k, v) => {
+    if (!isEditable) return
+    setItems(x => x.map((it, j) => j === i ? { ...it, [k]: v } : it))
+    setErrFields(x => ({ ...x, [`item_${i}_${k}`]: false }))
+  }
+  const addItem = () => {
+    if (!isEditable) return
+    setItems(x => [...x, { ...EMPTY_ITEM }])
+  }
+  const removeItem = (i) => {
+    if (!isEditable) return
+    setItems(x => x.filter((_, j) => j !== i))
+  }
+
+  const handleSave = async () => {
+    if (!isEditable) return
+    const newErrFields = {}
+    const msgs = []
+
+    for (let i = 0; i < items.length; i++) {
+      if (!items[i].desc.trim()) {
+        newErrFields[`item_${i}_desc`] = true
+        msgs.push(`${i+1}. kalemin ürün açıklaması`)
+      }
+      const qtyNum = parseFloat(String(items[i].qty).replace(',','.').trim())
+      if (!items[i].qty || isNaN(qtyNum) || qtyNum <= 0) {
+        newErrFields[`item_${i}_qty`] = true
+        msgs.push(`${i+1}. kalem miktarı`)
+      }
+    }
+    if (project === 'DİĞER' && !customProj.trim()) { newErrFields.customProj = true; msgs.push('Proje adı') }
+    if (!job.trim()) { newErrFields.job = true; msgs.push('İş Tanımı / Kullanım Yeri') }
+
+    if (msgs.length > 0) {
+      setErrFields(newErrFields)
+      setErr('Lütfen eksik alanları doldurunuz: ' + msgs.join(', '))
+      return
+    }
+
+    setErr('')
+    setErrFields({})
+    setBusy(true)
+
+    const finalProject = project === 'DİĞER' ? customProj.trim() : project
+
+    const { error } = await supabase.from('orders')
+      .update({
+        product_description: items.length === 1 ? items[0].desc : JSON.stringify(items),
+        quantity:            parseFloat(String(items[0].qty).replace(',','.').trim()) || 0,
+        unit:                items[0].unit,
+        project:             finalProject,
+        job_description:     job,
+        urgency:             urgency,
+        notes:               note,
+        updated_at:          new Date().toISOString()
+      })
+      .eq('id', order.id)
+
+    if (error) {
+      setErr('Sipariş güncellenemedi: ' + error.message)
+      setBusy(false)
+    } else {
+      setSaveSuccess(true)
+      setTimeout(() => {
+        setSaveSuccess(false)
+        onSave()
+      }, 1000)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!isEditable) return
+    if (window.confirm('Bu siparişi tamamen iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz ve sipariş numarası boşa çıkar.')) {
+      setBusy(true)
+      const { error } = await supabase.from('orders').delete().eq('id', order.id)
+      if (error) {
+        setErr('Sipariş iptal edilemedi: ' + error.message)
+        setBusy(false)
+      } else {
+        onDelete()
+      }
+    }
+  }
+
+  return (
+    <div className="fade" style={{padding:'1rem'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <button onClick={onBack} style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:13,fontFamily:"'DM Sans',sans-serif",display:'flex',alignItems:'center',gap:5,fontWeight:600}}>← Geri Dön</button>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={() => printOrder(order)} style={{background:'rgba(255,107,53,.12)',border:'1px solid rgba(255,107,53,.3)',color:'var(--accent)',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>🖨️ Yazdır</button>
+          <button onClick={() => downloadOrderPDF(order)} style={{background:'rgba(34,201,122,.1)',border:'1px solid rgba(34,201,122,.3)',color:'#22c97a',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>⬇️ İndir</button>
+        </div>
+      </div>
+
+      {saveSuccess && (
+        <div style={{background:'rgba(34,201,122,.1)',border:'1px solid rgba(34,201,122,.35)',borderRadius:11,padding:'12px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:24}}>✅</span>
+          <div>
+            <div style={{color:'#22c97a',fontWeight:700,fontSize:13}}>Sipariş güncellendi!</div>
+          </div>
+        </div>
+      )}
+
+      {err && (
+        <div style={{background:'rgba(239,68,68,.12)',border:'2px solid rgba(239,68,68,.5)',borderRadius:11,padding:'12px 14px',marginBottom:12,display:'flex',alignItems:'flex-start',gap:10}}>
+          <span style={{fontSize:22,flexShrink:0}}>⚠️</span>
+          <div>
+            <div style={{color:'#ef4444',fontWeight:700,fontSize:13,marginBottom:2}}>Hata!</div>
+            <div style={{color:'#f87171',fontSize:12,lineHeight:1.5}}>{err}</div>
+          </div>
+        </div>
+      )}
+
+      {!isEditable && (
+        <div style={{background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:10,padding:'12px 14px',marginBottom:12,display:'flex',alignItems:'flex-start',gap:8}}>
+          <span style={{fontSize:18}}>⚠️</span>
+          <div style={{fontSize:12,color:'#f59e0b',lineHeight:1.5,fontWeight:600}}>
+            Bu sipariş işlem gördüğü ({order.status === 'onaylandi' ? 'Onaylandı' : 'Reddedildi'}) için üzerinde değişiklik veya iptal işlemi yapılamaz.
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:17,color:'var(--accent)'}}>{order.order_no}</div>
+            <div style={{color:'var(--text2)',fontSize:11,marginTop:2}}>{new Date(order.created_at).toLocaleString('tr-TR')}</div>
+          </div>
+          <Badge status={order.status}/>
+        </div>
+
+        {/* Sipariş Veren */}
+        <div style={{background:'rgba(255,107,53,.06)',border:'1px solid rgba(255,107,53,.18)',borderRadius:9,padding:'9px 13px',display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:16}}>👤</span>
+          <div>
+            <div style={{fontSize:10,color:'var(--text2)',textTransform:'uppercase',letterSpacing:.8,fontWeight:600}}>Sipariş Veren</div>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{order.user_name}</div>
+          </div>
+        </div>
+
+        {/* Kalemler */}
+        <div>
+          <div style={{fontSize:10,color:'var(--text2)',textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:700}}>
+            Ürün Kalemleri
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {items.map((item, i) => (
+              <div key={i} style={{background:'var(--bg)',borderRadius:10,padding:'10px',border:'1px solid var(--border)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <span style={{fontSize:11,color:'var(--accent)',fontWeight:700}}>{i+1}. Kalem</span>
+                  {isEditable && items.length > 1 && (
+                    <button onClick={() => removeItem(i)} style={{background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.25)',color:'#ef4444',borderRadius:6,padding:'3px 8px',fontSize:11,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                      Kaldır
+                    </button>
+                  )}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:7}}>
+                  <textarea
+                    rows={2}
+                    value={item.desc}
+                    disabled={!isEditable}
+                    onChange={e => setItem(i, 'desc', e.target.value)}
+                    placeholder="Ürün adı, kodu, teknik özellikler..."
+                    style={{resize:'vertical', borderColor: errFields[`item_${i}_desc`] ? '#ef4444' : undefined}}
+                  />
+                  {errFields[`item_${i}_desc`] && <div style={{fontSize:11,color:'#ef4444',marginTop:-4}}>⚠ Ürün açıklaması zorunludur</div>}
+                  <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8}}>
+                    <div>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={item.qty}
+                        disabled={!isEditable}
+                        onChange={e => setItem(i, 'qty', e.target.value.replace(',','.'))}
+                        placeholder="Miktar"
+                        style={{borderColor: errFields[`item_${i}_qty`] ? '#ef4444' : undefined}}
+                      />
+                      {errFields[`item_${i}_qty`] && <div style={{fontSize:11,color:'#ef4444',marginTop:3}}>⚠ Miktar zorunludur</div>}
+                    </div>
+                    <select value={item.unit} disabled={!isEditable} onChange={e => setItem(i, 'unit', e.target.value)}>
+                      {UNITS.map(u => <option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {isEditable && (
+            <button
+              onClick={addItem}
+              style={{width:'100%',marginTop:9,padding:'9px',background:'transparent',color:'var(--accent)',border:'1.5px dashed rgba(255,107,53,.4)',borderRadius:9,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer',transition:'all .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,107,53,.06)'}
+              onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+            >
+              + Kalem Ekle
+            </button>
+          )}
+        </div>
+
+        {/* Proje */}
+        <Fld label="Proje">
+          <select value={project} disabled={!isEditable} onChange={e=>setProject(e.target.value)}>
+            {PROJECTS.map(p=><option key={p}>{p}</option>)}
+          </select>
+          {project==='DİĞER' && <input value={customProj} disabled={!isEditable} onChange={e=>setCustomProj(e.target.value)} placeholder="Proje adını yazınız..." style={{marginTop:7}}/>}
+        </Fld>
+
+        {/* İş Tanımı */}
+        <Fld label="İş Tanımı / Kullanım Yeri">
+          <textarea rows={2} value={job} disabled={!isEditable} onChange={e=>setJob(e.target.value)} placeholder="Bu malzeme hangi iş için, nerede kullanılacak?" style={{resize:'vertical', borderColor: errFields.job ? '#ef4444' : undefined}}/>
+          {errFields.job && <div style={{fontSize:11,color:'#ef4444',marginTop:3}}>⚠ İş tanımı zorunludur</div>}
+        </Fld>
+
+        {/* Aciliyet */}
+        <Fld label="Aciliyet">
+          <div style={{display:'flex',gap:7}}>
+            {URGENCIES.map(u=>(
+              <button key={u.l} disabled={!isEditable} onClick={()=>setUrgency(u.l)} style={{flex:1,padding:'8px 4px',borderRadius:8,border:`2px solid ${urgency===u.l?u.c:'var(--border)'}`,background:urgency===u.l?`${u.c}18`:'transparent',color:urgency===u.l?u.c:'#3e5e78',fontSize:11,fontWeight:700,cursor:isEditable?'pointer':'default',fontFamily:"'DM Sans',sans-serif",transition:'all .15s',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <span>{u.l}</span>
+                <span style={{fontSize:9,fontWeight:400,color:urgency===u.l?u.c:'#2e4a60',lineHeight:1.2}}>{u.sub}</span>
+              </button>
+            ))}
+          </div>
+        </Fld>
+
+        {/* Not */}
+        <Fld label="Not (İsteğe Bağlı)">
+          <input value={note} disabled={!isEditable} onChange={e=>setNote(e.target.value)} placeholder="Tedarikçi tercihi, ek notlar..."/>
+        </Fld>
+
+        {order.admin_note && (
+          <div style={{background:'rgba(255,107,53,.08)',border:'1px solid rgba(255,107,53,.2)',borderRadius:8,padding:'9px 12px'}}>
+            <div style={{fontSize:10,color:'var(--accent)',fontWeight:700,marginBottom:3,letterSpacing:.8}}>ADMİN NOTU</div>
+            <div style={{fontSize:13,color:'var(--text)'}}>{order.admin_note}</div>
+          </div>
+        )}
+
+        {isEditable && (
+          <div style={{display:'flex',flexDirection:'column',gap:9,marginTop:8}}>
+            <button onClick={handleSave} disabled={busy} style={{width:'100%',padding:'13px',background:'linear-gradient(135deg,#ff6b35,#e85520)',color:'white',border:'none',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,cursor:'pointer',boxShadow:'0 4px 16px rgba(255,107,53,.28)',opacity:busy?.7:1}}>
+              {busy ? 'Kaydediliyor...' : '💾  Güncellemeleri Kaydet'}
+            </button>
+            <button onClick={handleDelete} disabled={busy} style={{width:'100%',padding:'11px',background:'rgba(239,68,68,.12)',border:'1px solid rgba(239,68,68,.28)',color:'#ef4444',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>
+              {busy ? 'Siliniyor...' : '❌  Siparişi İptal Et (Sil)'}
+            </button>
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 // ── MY ORDERS ─────────────────────────────────────────────
 function MyOrdersView({ profile }) {
   const [orders,  setOrders]  = useState([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState('')
-  const [dateFrom,setDateFrom]= useState('')
+  const [dateFrom,setDateFrom] = useState('')
   const [dateTo,  setDateTo]  = useState('')
+  const [selOrder, setSelOrder] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -772,6 +1041,24 @@ function MyOrdersView({ profile }) {
   })
 
   if (loading) return <Spin/>
+
+  if (selOrder) {
+    return (
+      <MyOrderDetailView
+        order={selOrder}
+        onBack={() => setSelOrder(null)}
+        onSave={() => {
+          setSelOrder(null)
+          load()
+        }}
+        onDelete={() => {
+          setSelOrder(null)
+          load()
+        }}
+      />
+    )
+  }
+
   return (
     <div className="fade" style={{padding:'1rem'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -795,7 +1082,7 @@ function MyOrdersView({ profile }) {
       </div>
       {filtered.length===0
         ? <Empty icon="📭" msg={orders.length===0?"Henüz sipariş oluşturmadınız.":"Arama kriterlerine uyan sipariş bulunamadı."}/>
-        : <div style={{display:'flex',flexDirection:'column',gap:8}}>{filtered.map(o=><OCard key={o.id} order={o} onPrint={()=>printOrder(o)}/>)}</div>
+        : <div style={{display:'flex',flexDirection:'column',gap:8}}>{filtered.map(o=><OCard key={o.id} order={o} onPrint={()=>printOrder(o)} onClick={() => setSelOrder(o)}/>)}</div>
       }
     </div>
   )
