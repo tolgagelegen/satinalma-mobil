@@ -4,3 +4,8 @@ dist
 .tmp.*
 vite.config.js.timestamp-*
 .vercel
+yedekleme.ps1
+gorev_kur.ps1
+GOREVI_KUR_ADMIN.bat
+github_yukle.bat
+gorev_kur_result.txt
