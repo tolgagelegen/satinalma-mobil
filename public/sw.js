@@ -1,4 +1,4 @@
-const CACHE = 'satinalma-v1'
+const CACHE = 'satinalma-v2'
 const ASSETS = ['/', '/index.html']
 
 self.addEventListener('install', e => {

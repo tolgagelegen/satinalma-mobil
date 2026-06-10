@@ -462,7 +462,7 @@ function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPe
 
     if (isAdmin) {
       // Admin: yeni sipariş geldiğinde bildir
-      const ch = supabase
+      const chInsert = supabase
         .channel('admin-new-orders')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
           const o = payload.new
@@ -474,7 +474,27 @@ function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPe
           )
         })
         .subscribe()
-      return () => supabase.removeChannel(ch)
+
+      // Admin: kullanıcı mevcut siparişini düzenlediğinde bildir
+      // Supabase UPDATE payload'ında old record gelmeyebilir; sadece new.status kontrolü yeterli
+      const chUpdate = supabase
+        .channel('admin-order-edits')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
+          const o = payload.new
+          // status hâlâ 'beklemede' ise → kullanıcı kendi siparişini düzenledi
+          if (o.status !== 'beklemede') return
+          showBrowserNotification(
+            `✏️ Sipariş Düzenlendi: ${o.order_no}`,
+            `${o.user_name} siparişini güncelledi.\n${o.project}`,
+            'info'
+          )
+        })
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(chInsert)
+        supabase.removeChannel(chUpdate)
+      }
     } else {
       // Saha şefi: kendi siparişinin durumu değiştiğinde bildir
       const ch = supabase
@@ -1106,6 +1126,17 @@ function AllOrdersView({ profile }) {
   },[])
 
   useEffect(()=>{ load() },[load])
+
+  // Realtime: siparişler eklenince, güncellenince veya silinince listeyi otomatik yenile
+  useEffect(() => {
+    const ch = supabase
+      .channel('admin-orders-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => load())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => load())
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [load])
 
   const counts = {
     beklemede:  orders.filter(o=>o.status==='beklemede').length,
