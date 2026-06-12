@@ -326,7 +326,7 @@ export default function App() {
   const loadProfile = async (uid) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
     setProfile(data)
-    setTab(data?.role === 'admin' ? 'all' : 'new')
+    setTab(data?.role === 'admin' || data?.role === 'viewer' ? 'all' : 'new')
     setLoading(false)
   }
 
@@ -452,9 +452,12 @@ function NoProfileView({ onLogout }) {
 // ── SHELL ─────────────────────────────────────────────────
 function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPerm, onRequestNotif, themeIdx, onThemeChange }) {
   const isAdmin = profile?.role === 'admin'
+  const isViewer = profile?.role === 'viewer'
   const tabs = isAdmin
     ? [{id:'all',icon:'📋',label:'Siparişler'},{id:'users',icon:'👥',label:'Kullanıcılar'}]
-    : [{id:'new',icon:'➕',label:'Yeni Sipariş'},{id:'my',icon:'📦',label:'Siparişlerim'}]
+    : (isViewer
+        ? [{id:'all',icon:'📋',label:'Siparişler'}]
+        : [{id:'new',icon:'➕',label:'Yeni Sipariş'},{id:'my',icon:'📦',label:'Siparişlerim'}])
 
   // ── Realtime notifications ──────────────────────────────
   useEffect(() => {
@@ -525,7 +528,7 @@ function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPe
           </div>
           <div>
             <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:14,letterSpacing:'-.3px',lineHeight:1.1}}>SATINALMA</div>
-            <div style={{fontSize:11,color:'var(--text2)'}}>{profile?.name}{isAdmin&&<span style={{color:'var(--accent)',fontWeight:700}}> · Admin</span>}</div>
+            <div style={{fontSize:11,color:'var(--text2)'}}>{profile?.name}{isAdmin&&<span style={{color:'var(--accent)',fontWeight:700}}> · Admin</span>}{isViewer&&<span style={{color:'#9f7aea',fontWeight:700}}> · İzleyici</span>}</div>
           </div>
         </div>
         <div style={{display:'flex',gap:7,alignItems:'center'}}>
@@ -1110,6 +1113,7 @@ function MyOrdersView({ profile }) {
 
 // ── ALL ORDERS (ADMIN) ────────────────────────────────────
 function AllOrdersView({ profile }) {
+  const isAdmin = profile?.role === 'admin'
   const [orders,  setOrders]  = useState([])
   const [loading, setLoading] = useState(true)
   const [filter,  setFilter]  = useState('all')
@@ -1220,7 +1224,7 @@ function AllOrdersView({ profile }) {
             </div>
           ))}
 
-          {sel.status==='beklemede' && <>
+          {isAdmin && sel.status==='beklemede' && <>
             <div style={{borderTop:'1px solid var(--border)',paddingTop:14}}>
               <Fld label="Admin Notu (İsteğe Bağlı)">
                 <textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="Red sebebi, revizyon talebi..." style={{resize:'vertical'}}/>
@@ -1337,10 +1341,10 @@ function UsersView({ profile, reloadProfile }) {
           <div key={u.id} style={{background:'var(--bg2)',borderRadius:12,padding:'12px',border:'1px solid var(--border)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <div style={{width:38,height:38,borderRadius:10,background:u.role==='admin'?'rgba(255,107,53,.14)':'var(--border)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{u.role==='admin'?'👑':'👷'}</div>
+                <div style={{width:38,height:38,borderRadius:10,background:u.role==='admin'?'rgba(255,107,53,.14)':(u.role==='viewer'?'rgba(159,122,234,.14)':'var(--border)'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>{u.role==='admin'?'👑':(u.role==='viewer'?'👁️':'👷')}</div>
                 <div>
                   <div style={{fontWeight:700,fontSize:13,color:'var(--text)'}}>{u.name||'—'}</div>
-                  <div style={{fontSize:10,color:u.role==='admin'?'#ff6b35':'#3e5e78',fontWeight:700,marginTop:2,textTransform:'uppercase',letterSpacing:.6}}>{u.role==='admin'?'Admin':'Saha Şefi'}</div>
+                  <div style={{fontSize:10,color:u.role==='admin'?'#ff6b35':(u.role==='viewer'?'#9f7aea':'#3e5e78'),fontWeight:700,marginTop:2,textTransform:'uppercase',letterSpacing:.6}}>{u.role==='admin'?'Admin':(u.role==='viewer'?'İzleyici':'Saha Şefi')}</div>
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -1351,13 +1355,16 @@ function UsersView({ profile, reloadProfile }) {
                   ✏️ İsim
                 </button>
                 {u.id !== profile.id && (
-                  <button
-                    onClick={()=>setRole(u.id, u.role==='admin'?'user':'admin')}
+                  <select
+                    value={u.role || 'user'}
+                    onChange={(e)=>setRole(u.id, e.target.value)}
                     disabled={saving===u.id}
-                    style={{padding:'5px 9px',background:u.role==='admin'?'rgba(239,68,68,.1)':'rgba(34,201,122,.1)',border:`1px solid ${u.role==='admin'?'rgba(239,68,68,.3)':'rgba(34,201,122,.3)'}`,color:u.role==='admin'?'#ef4444':'#22c97a',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",whiteSpace:'nowrap'}}
+                    style={{padding:'4px 8px',background:'var(--bg)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",outline:'none'}}
                   >
-                    {saving===u.id ? '...' : u.role==='admin' ? 'Şef Yap' : 'Admin Yap'}
-                  </button>
+                    <option value="user">Saha Şefi</option>
+                    <option value="viewer">İzleyici</option>
+                    <option value="admin">Admin</option>
+                  </select>
                 )}
               </div>
             </div>
