@@ -1163,6 +1163,13 @@ function AllOrdersView({ profile }) {
     setSel(null); setNote(''); load(); setSaving(false)
   }
 
+  const saveNote = async () => {
+    setSaving(true)
+    await supabase.from('orders').update({admin_note:note, updated_at:new Date().toISOString()}).eq('id',sel.id)
+    setSel(prev => ({...prev, admin_note:note}))
+    load(); setSaving(false)
+  }
+
   if (loading) return <Spin/>
 
   // Detail
@@ -1236,7 +1243,24 @@ function AllOrdersView({ profile }) {
             </div>
           </>}
 
-          {sel.admin_note && (
+          {isAdmin && (sel.status==='onaylandi' || sel.status==='reddedildi') && <>
+            <div style={{borderTop:'1px solid var(--border)',paddingTop:14}}>
+              <Fld label="Admin Notu (Düzenlenebilir)">
+                <textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} placeholder="Not ekle veya düzenle..." style={{resize:'vertical'}}/>
+              </Fld>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={saveNote} disabled={saving} style={{flex:1,padding:'10px',background:'rgba(99,179,237,.15)',color:'#63b3ed',border:'1px solid rgba(99,179,237,.4)',borderRadius:9,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>
+                {saving ? '...' : '💾 Notu Kaydet'}
+              </button>
+              <button onClick={()=>{ if(window.confirm('Bu siparişi tekrar \'Beklemede\' durumuna almak istediğinizden emin misiniz?')) act('beklemede') }} disabled={saving} style={{flex:1,padding:'10px',background:'rgba(245,158,11,.12)',color:'#f59e0b',border:'1px solid rgba(245,158,11,.35)',borderRadius:9,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>
+                {saving ? '...' : '↩️ Geri Al'}
+              </button>
+            </div>
+          </>
+          }
+
+          {!isAdmin && sel.admin_note && (
             <div style={{background:'rgba(255,107,53,.08)',border:'1px solid rgba(255,107,53,.2)',borderRadius:8,padding:'9px 12px'}}>
               <div style={{fontSize:10,color:'var(--accent)',fontWeight:700,marginBottom:3,letterSpacing:.8}}>ADMİN NOTU</div>
               <div style={{fontSize:13,color:'var(--text)'}}>{sel.admin_note}</div>
