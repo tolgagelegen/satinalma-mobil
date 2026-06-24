@@ -582,7 +582,7 @@ function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPe
 
 // ── NEW ORDER ─────────────────────────────────────────────
 const EMPTY_ITEM = { desc:'', qty:'', unit:'Adet' }
-const EMPTY_FORM = { project:'FLATS PROJESİ', customProj:'', job:'', urgency:'Normal', note:'' }
+const EMPTY_FORM = { project:'FLATS PROJESİ', customProj:'', job:'', urgency:'Normal', urgencyReason:'', note:'' }
 
 function NewOrderView({ profile }) {
   const [items,    setItems]    = useState([{ ...EMPTY_ITEM }])
@@ -617,6 +617,7 @@ function NewOrderView({ profile }) {
     }
     if (f.project === 'DİĞER' && !f.customProj.trim()) { newErrFields.customProj = true; msgs.push('Proje adı') }
     if (!f.job.trim()) { newErrFields.job = true; msgs.push('İş Tanımı / Kullanım Yeri') }
+    if (f.urgency === 'Çok Acil' && !f.urgencyReason.trim()) { newErrFields.urgencyReason = true; msgs.push('Çok Acil Sebebi') }
 
     if (msgs.length > 0) {
       setErrFields(newErrFields)
@@ -642,7 +643,9 @@ function NewOrderView({ profile }) {
       project:             f.project === 'DİĞER' ? f.customProj : f.project,
       job_description:     f.job,
       urgency:             f.urgency,
-      notes:               f.note,
+      notes:               f.urgency === 'Çok Acil' && f.urgencyReason.trim()
+                             ? `⚠️ Çok Acil Sebebi: ${f.urgencyReason.trim()}${f.note.trim() ? '\n\n' + f.note.trim() : ''}`
+                             : f.note,
     })
 
     if (error) setErr('Sipariş kaydedilemedi: ' + error.message)
@@ -756,6 +759,21 @@ function NewOrderView({ profile }) {
             ))}
           </div>
         </Fld>
+
+        {/* Çok Acil Sebebi */}
+        {f.urgency === 'Çok Acil' && (
+          <Fld label="Çok Acil Sebebi (Zorunlu)">
+            <textarea
+              rows={2}
+              value={f.urgencyReason}
+              onChange={e=>set('urgencyReason', e.target.value)}
+              placeholder="Neden çok acil? (Üretim durması, güvenlik riski, acil teslim vb.)"
+              style={{resize:'vertical', borderColor: errFields.urgencyReason ? '#ef4444' : 'rgba(239,68,68,.4)', boxShadow: errFields.urgencyReason ? '0 0 0 3px rgba(239,68,68,.2)' : '0 0 0 1px rgba(239,68,68,.15)'}}
+              autoFocus
+            />
+            {errFields.urgencyReason && <div style={{fontSize:11,color:'#ef4444',marginTop:3}}>⚠ Çok acil sebebi zorunludur</div>}
+          </Fld>
+        )}
 
         {/* Not */}
         <Fld label="Not (İsteğe Bağlı)">
