@@ -171,7 +171,7 @@ const printOrder = (order) => {
     .fold-mark {
       display: block;
       position: fixed;
-      top: 148.5mm;
+      top: 50%;
       left: 0;
       width: 100%;
       pointer-events: none;
