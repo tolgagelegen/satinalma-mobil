@@ -164,8 +164,34 @@ const printOrder = (order) => {
   .sign-line { border-top: 1.5px solid #333; margin-bottom: 6px; }
   .sign-printed { font-size: 12px; font-weight: 600; color: #333; text-align: center; }
   @media print { @page { margin: 1.5cm; } }
+  .fold-mark {
+    display: none;
+  }
+  @media print {
+    .fold-mark {
+      display: block;
+      position: fixed;
+      top: 148.5mm;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+    }
+    .fold-mark::before,
+    .fold-mark::after {
+      content: '';
+      display: block;
+      position: absolute;
+      top: 0;
+      width: 8mm;
+      height: 0;
+      border-top: 1px dashed #bbb;
+    }
+    .fold-mark::before { left: 0; }
+    .fold-mark::after  { right: 0; }
+  }
 </style>
 </head><body>
+<div class="fold-mark"></div>
 <div class="header">
   <div>
     <div class="logo"><img src="${window.location.origin}/logo.jpg" alt="Mehmet Kavan Yapı"/>SATINALMA SİSTEMİ<span>Mehmet Kavan Yapı · Saha Sipariş Portalı</span></div>
