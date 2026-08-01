@@ -1155,6 +1155,165 @@ function MyOrdersView({ profile }) {
   )
 }
 
+// ── PRICE ANALYSIS SECTION ────────────────────────────────
+function PriceAnalysisSection({ order, items }) {
+  const [open,       setOpen]      = useState(false)
+  const [rows,       setRows]      = useState(() =>
+    items.map(() => ({ suppliers: [{ name:'', unitPrice:'' }, { name:'', unitPrice:'' }], note:'' }))
+  )
+  const [saving,     setSaving]    = useState(false)
+  const [loaded,     setLoaded]    = useState(false)
+  const [existingId, setExistingId]= useState(null)
+  const [saved,      setSaved]     = useState(false)
+
+  useEffect(() => {
+    if (!open || loaded) return
+    supabase.from('price_analyses').select('*').eq('order_id', order.id).maybeSingle()
+      .then(({ data }) => {
+        if (data?.data?.rows) { setRows(data.data.rows); setExistingId(data.id) }
+        setLoaded(true)
+      })
+  }, [open, loaded, order.id])
+
+  const fmt = (n) => (parseFloat(n)||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})
+
+  const upd = (i,j,field,val) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {
+    ...r, suppliers: r.suppliers.map((s,si) => si!==j ? s : {...s,[field]:val})
+  }))
+  const addSup = (i) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {
+    ...r, suppliers: [...r.suppliers, {name:'',unitPrice:''}]
+  }))
+  const delSup = (i,j) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {
+    ...r, suppliers: r.suppliers.filter((_,si)=>si!==j)
+  }))
+  const setNote = (i,v) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {...r,note:v}))
+
+  const getBest = (sups, qty) => {
+    let bestIdx=null, bestTotal=Infinity
+    sups.forEach((s,i) => { const p=parseFloat(s.unitPrice)||0; if(p>0 && p*qty<bestTotal){bestTotal=p*qty;bestIdx=i} })
+    return bestIdx
+  }
+
+  const grandTotal = () => rows.reduce((sum,r,i)=>{
+    const qty=parseFloat(items[i]?.qty)||0
+    const bi=getBest(r.suppliers,qty)
+    return sum + (bi!==null ? (parseFloat(r.suppliers[bi].unitPrice)||0)*qty : 0)
+  },0)
+
+  const save = async () => {
+    setSaving(true)
+    const payload = { order_id:order.id, data:{rows}, updated_at:new Date().toISOString() }
+    if (existingId) {
+      await supabase.from('price_analyses').update(payload).eq('id',existingId)
+    } else {
+      const {data} = await supabase.from('price_analyses').insert(payload).select().single()
+      if (data) setExistingId(data.id)
+    }
+    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),3000)
+  }
+
+  const gt = grandTotal()
+  const inputStyle = { background:'rgba(255,255,255,.05)', border:'1px solid var(--border)', borderRadius:6, padding:'5px 8px', color:'var(--text)', fontSize:12, fontFamily:"'DM Sans',sans-serif" }
+
+  return (
+    <div style={{marginTop:12}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{
+        width:'100%', padding:'11px 14px', background: open ? 'rgba(99,179,237,.12)' : 'rgba(99,179,237,.07)',
+        border:'1px solid rgba(99,179,237,.3)', borderRadius:11, color:'#63b3ed',
+        fontFamily:"'DM Sans',sans-serif", fontWeight:700, fontSize:13, cursor:'pointer',
+        display:'flex', justifyContent:'space-between', alignItems:'center', transition:'all .15s'
+      }}>
+        <span>📊 Fiyat Analizi {existingId ? <span style={{fontSize:10,background:'rgba(34,201,122,.18)',color:'#22c97a',border:'1px solid rgba(34,201,122,.3)',borderRadius:4,padding:'1px 6px',marginLeft:6}}>Kayıtlı ✓</span> : ''}</span>
+        <span style={{fontSize:10}}>{open ? '▲ Kapat' : '▼ Aç'}</span>
+      </button>
+
+      {open && <div style={{marginTop:10}}>
+        {rows.map((row,i) => {
+          const it = items[i]||{}
+          const qty = parseFloat(it.qty)||0
+          const bestIdx = getBest(row.suppliers, qty)
+          return (
+            <Card key={i} style={{marginBottom:10}}>
+              <div style={{fontSize:10,color:'var(--accent)',fontWeight:700,textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>{i+1}. Kalem</div>
+              <div style={{fontSize:13,color:'var(--text)',marginBottom:3,lineHeight:1.3}}>{it.desc}</div>
+              <div style={{fontSize:11,color:'var(--text2)',marginBottom:10}}>📦 {it.qty} {it.unit}</div>
+
+              <div style={{fontSize:10,color:'var(--text2)',textTransform:'uppercase',letterSpacing:.8,fontWeight:600,marginBottom:6}}>Tedarikçi Fiyatları</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:8}}>
+                {row.suppliers.map((sup,j)=>{
+                  const total=(parseFloat(sup.unitPrice)||0)*qty
+                  const isBest=j===bestIdx && total>0
+                  return (
+                    <div key={j} style={{background:isBest?'rgba(34,201,122,.07)':'var(--bg)',border:`1px solid ${isBest?'rgba(34,201,122,.3)':'var(--border)'}`,borderRadius:8,padding:'8px 10px'}}>
+                      <div style={{display:'flex',gap:6,marginBottom:5,alignItems:'center'}}>
+                        <input value={sup.name} onChange={e=>upd(i,j,'name',e.target.value)} placeholder={`Tedarikçi ${j+1}`} style={{...inputStyle,flex:1}}/>
+                        {isBest && <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:4,background:'rgba(34,201,122,.18)',color:'#22c97a',border:'1px solid rgba(34,201,122,.35)',whiteSpace:'nowrap'}}>En Uygun</span>}
+                        {row.suppliers.length>1 && <button onClick={()=>delSup(i,j)} style={{background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.2)',color:'#ef4444',borderRadius:5,padding:'3px 7px',fontSize:11,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>Sil</button>}
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Birim Fiyat (₺)</div>
+                          <input type="number" value={sup.unitPrice} onChange={e=>upd(i,j,'unitPrice',e.target.value)} placeholder="0.00" style={{...inputStyle,width:'100%',textAlign:'right'}}/>
+                        </div>
+                        <div style={{flex:1,textAlign:'right'}}>
+                          <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Toplam</div>
+                          <div style={{fontSize:13,fontWeight:700,color:isBest?'#22c97a':'var(--text)',padding:'5px 0'}}>{total>0?`${fmt(total)} ₺`:'—'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button onClick={()=>addSup(i)} style={{width:'100%',padding:'7px',background:'transparent',border:'1.5px dashed rgba(255,107,53,.3)',borderRadius:7,color:'var(--accent)',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",cursor:'pointer',marginBottom:8}}>
+                + Tedarikçi Ekle
+              </button>
+
+              {bestIdx!==null && (
+                <div style={{background:'rgba(34,201,122,.08)',border:'1px solid rgba(34,201,122,.25)',borderRadius:8,padding:'8px 11px',marginBottom:8}}>
+                  <div style={{fontSize:10,color:'#22c97a',fontWeight:700,textTransform:'uppercase',letterSpacing:.8,marginBottom:3}}>✓ En Uygun Fiyat</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{row.suppliers[bestIdx].name||`Tedarikçi ${bestIdx+1}`}</div>
+                  <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>
+                    {fmt((parseFloat(row.suppliers[bestIdx].unitPrice)||0)*qty)} ₺ &nbsp;·&nbsp; {fmt(row.suppliers[bestIdx].unitPrice)} ₺/{it.unit}
+                  </div>
+                </div>
+              )}
+
+              <div style={{fontSize:10,color:'var(--text2)',textTransform:'uppercase',letterSpacing:.8,fontWeight:600,marginBottom:4}}>Not</div>
+              <textarea rows={2} value={row.note} onChange={e=>setNote(i,e.target.value)} placeholder="Nakliye dahil mi? Teslim süresi? Ödeme vadesi?" style={{resize:'vertical',fontSize:12}}/>
+            </Card>
+          )
+        })}
+
+        {gt > 0 && (
+          <div style={{background:'linear-gradient(135deg,rgba(255,107,53,.12),rgba(255,107,53,.06))',border:'1px solid rgba(255,107,53,.25)',borderRadius:11,padding:14,marginBottom:10}}>
+            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,color:'var(--accent)',marginBottom:8}}>📋 Toplam Maliyet Tahmini</div>
+            {rows.map((r,i)=>{
+              const it=items[i]||{}, qty=parseFloat(it.qty)||0
+              const bi=getBest(r.suppliers,qty)
+              const total=bi!==null?(parseFloat(r.suppliers[bi].unitPrice)||0)*qty:0
+              return total>0?(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'4px 0',borderBottom:'1px solid rgba(255,107,53,.1)'}}>
+                  <span style={{color:'var(--text2)'}}>{i+1}. {(it.desc||'').substring(0,28)}{(it.desc||'').length>28?'…':''}</span>
+                  <span style={{fontWeight:700,color:'var(--text)'}}>{fmt(total)} ₺</span>
+                </div>
+              ):null
+            })}
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:14,paddingTop:8,fontWeight:800}}>
+              <span style={{color:'var(--accent)'}}>Genel Toplam</span>
+              <span style={{color:'var(--accent)'}}>{fmt(gt)} ₺</span>
+            </div>
+          </div>
+        )}
+
+        <button onClick={save} disabled={saving} style={{width:'100%',padding:'12px',background:saved?'#22c97a':'linear-gradient(135deg,#63b3ed,#4a90d9)',color:'white',border:'none',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer',boxShadow:'0 4px 14px rgba(99,179,237,.25)',opacity:saving?.7:1,transition:'background .3s'}}>
+          {saving ? 'Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Fiyat Analizini Kaydet'}
+        </button>
+      </div>}
+    </div>
+  )
+}
+
 // ── ALL ORDERS (ADMIN) ────────────────────────────────────
 function AllOrdersView({ profile }) {
   const isAdmin = profile?.role === 'admin'
@@ -1311,6 +1470,15 @@ function AllOrdersView({ profile }) {
             </div>
           )}
         </Card>
+
+        {/* Fiyat Analizi — sadece admin, sipariş no > 1200 */}
+        {isAdmin && (() => {
+          const nums = (sel.order_no || '').match(/\d+/g)
+          const seq  = nums ? parseInt(nums[nums.length - 1]) : 0
+          return seq > 1200
+        })() && (
+          <PriceAnalysisSection order={sel} items={items} />
+        )}
       </div>
     )
   }
