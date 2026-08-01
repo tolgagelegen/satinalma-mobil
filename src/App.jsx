@@ -1202,14 +1202,17 @@ function PriceAnalysisSection({ order, items }) {
 
   const save = async () => {
     setSaving(true)
-    const payload = { order_id:order.id, data:{rows}, updated_at:new Date().toISOString() }
-    if (existingId) {
-      await supabase.from('price_analyses').update(payload).eq('id',existingId)
-    } else {
-      const {data} = await supabase.from('price_analyses').insert(payload).select().single()
-      if (data) setExistingId(data.id)
-    }
-    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),3000)
+    const { data, error } = await supabase
+      .from('price_analyses')
+      .upsert(
+        { order_id: order.id, data: { rows }, updated_at: new Date().toISOString() },
+        { onConflict: 'order_id' }
+      )
+      .select()
+      .single()
+    if (data && !existingId) setExistingId(data.id)
+    if (!error) { setSaved(true); setTimeout(()=>setSaved(false),3000) }
+    setSaving(false)
   }
 
   const printAnalysis = () => {
