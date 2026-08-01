@@ -1212,6 +1212,76 @@ function PriceAnalysisSection({ order, items }) {
     setSaving(false); setSaved(true); setTimeout(()=>setSaved(false),3000)
   }
 
+  const printAnalysis = () => {
+    const printDate = new Date().toLocaleString('tr-TR')
+    const fmtN = (n) => (parseFloat(n)||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})
+    const itemBlocks = rows.map((row, i) => {
+      const it = items[i] || {}
+      const qty = parseFloat(it.qty) || 0
+      const bestIdx = getBest(row.suppliers, qty)
+      const supplierRows = row.suppliers.map((sup, j) => {
+        const price = parseFloat(sup.unitPrice) || 0
+        const total = price * qty
+        const isBest = j === bestIdx && total > 0
+        return `<tr style="${isBest ? 'background:#f0fff8;font-weight:700;' : ''}">
+          <td style="padding:7px 10px;border:1px solid #e5e7eb">${sup.name || `Tedarikçi ${j+1}`} ${isBest ? '<span style="background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px">EN UYGUN ✓</span>' : ''}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right">${price > 0 ? fmtN(price) + ' ₺' : '—'}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center">${it.qty} ${it.unit}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;${isBest?'color:#065f46':''}'">${total > 0 ? fmtN(total) + ' ₺' : '—'}</td>
+        </tr>`
+      }).join('')
+      const bestTotal = bestIdx !== null ? (parseFloat(row.suppliers[bestIdx].unitPrice)||0)*qty : 0
+      return `
+        <div style="margin-bottom:22px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#ff6b35;margin-bottom:4px">${i+1}. Kalem</div>
+          <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:2px">${it.desc||''}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:8px">Miktar: ${it.qty} ${it.unit}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+            <thead><tr style="background:#f9fafb">
+              <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:left;font-size:10px;text-transform:uppercase;color:#888">Tedarikçi</th>
+              <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-size:10px;text-transform:uppercase;color:#888">Birim Fiyat</th>
+              <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-size:10px;text-transform:uppercase;color:#888">Miktar</th>
+              <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-size:10px;text-transform:uppercase;color:#888">Toplam</th>
+            </tr></thead>
+            <tbody>${supplierRows}</tbody>
+          </table>
+          ${bestTotal > 0 ? `<div style="background:#f0fff8;border:1px solid #a7f3d0;border-radius:6px;padding:7px 12px;font-size:12px"><strong>En Uygun:</strong> ${row.suppliers[bestIdx]?.name||`Tedarikçi ${bestIdx+1}`} — ${fmtN(bestTotal)} ₺</div>` : ''}
+          ${row.note ? `<div style="margin-top:6px;font-size:11px;color:#555"><strong>Not:</strong> ${row.note}</div>` : ''}
+        </div>`
+    }).join('')
+    const totalRows = rows.map((r,i)=>{
+      const it=items[i]||{}, qty=parseFloat(it.qty)||0
+      const bi=getBest(r.suppliers,qty)
+      const total=bi!==null?(parseFloat(r.suppliers[bi].unitPrice)||0)*qty:0
+      return total>0?`<tr><td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px">${i+1}. ${(it.desc||'').substring(0,40)}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-size:12px;font-weight:700">${fmtN(total)} ₺</td></tr>`:''}).join('')
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"/><title>Fiyat Analizi — ${order.order_no}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;color:#111;padding:28px 32px;font-size:13px}@media print{@page{margin:1.5cm}.fold-mark{display:block;position:fixed;top:50%;left:0;width:100%;pointer-events:none}.fold-mark::before,.fold-mark::after{content:'';display:block;position:absolute;top:0;width:8mm;height:0;border-top:1px dashed #bbb}.fold-mark::before{left:0}.fold-mark::after{right:0}}</style>
+</head><body>
+<div class="fold-mark"></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #ff6b35;padding-bottom:14px;margin-bottom:20px">
+  <div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#ff6b35;margin-bottom:2px">FİYAT ANALİZİ</div>
+    <div style="font-size:20px;font-weight:800;color:#111">${order.order_no}</div>
+    <div style="font-size:11px;color:#888;margin-top:3px">${order.user_name} · ${order.project}</div>
+  </div>
+  <div style="text-align:right;font-size:11px;color:#888">Çıktı: ${printDate}</div>
+</div>
+${itemBlocks}
+${gt>0?`<div style="border-top:2px solid #ff6b35;padding-top:14px;margin-top:4px">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#ff6b35;margin-bottom:8px">TOPLAM MALİYET TAHMİNİ</div>
+  <table style="width:100%;border-collapse:collapse">
+    <tbody>${totalRows}</tbody>
+    <tfoot><tr style="background:#fff8f5"><td style="padding:8px 10px;border:1px solid #ffd0be;font-weight:800;font-size:13px">GENEL TOPLAM</td><td style="padding:8px 10px;border:1px solid #ffd0be;text-align:right;font-weight:800;font-size:14px;color:#ff6b35">${fmtN(gt)} ₺</td></tr></tfoot>
+  </table>
+</div>`:''}
+</body></html>`
+    const w = window.open('','_blank','width=800,height=900')
+    w.document.write(html)
+    w.document.close()
+    setTimeout(()=>{ w.focus(); w.print() }, 600)
+  }
+
   const gt = grandTotal()
   const inputStyle = { background:'rgba(255,255,255,.05)', border:'1px solid var(--border)', borderRadius:6, padding:'5px 8px', color:'var(--text)', fontSize:12, fontFamily:"'DM Sans',sans-serif" }
 
@@ -1306,9 +1376,14 @@ function PriceAnalysisSection({ order, items }) {
           </div>
         )}
 
-        <button onClick={save} disabled={saving} style={{width:'100%',padding:'12px',background:saved?'#22c97a':'linear-gradient(135deg,#63b3ed,#4a90d9)',color:'white',border:'none',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer',boxShadow:'0 4px 14px rgba(99,179,237,.25)',opacity:saving?.7:1,transition:'background .3s'}}>
-          {saving ? 'Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Fiyat Analizini Kaydet'}
-        </button>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={save} disabled={saving} style={{flex:1,padding:'12px',background:saved?'#22c97a':'linear-gradient(135deg,#63b3ed,#4a90d9)',color:'white',border:'none',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer',boxShadow:'0 4px 14px rgba(99,179,237,.25)',opacity:saving?.7:1,transition:'background .3s'}}>
+            {saving ? 'Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Kaydet'}
+          </button>
+          <button onClick={printAnalysis} style={{flex:1,padding:'12px',background:'rgba(255,107,53,.12)',color:'var(--accent)',border:'1px solid rgba(255,107,53,.3)',borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>
+            🖨️ Yazdır
+          </button>
+        </div>
       </div>}
     </div>
   )
