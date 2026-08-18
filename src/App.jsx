@@ -1165,6 +1165,27 @@ function PriceAnalysisSection({ order, items }) {
   const [loaded,     setLoaded]    = useState(false)
   const [existingId, setExistingId]= useState(null)
   const [saved,      setSaved]     = useState(false)
+  const [vadeOptions,setVadeOptions]= useState(() => {
+    try { const s=localStorage.getItem('vadeOptions'); return s?JSON.parse(s):['Peşin','15 Gün','30 Gün','45 Gün','60 Gün','90 Gün'] }
+    catch{ return ['Peşin','15 Gün','30 Gün','45 Gün','60 Gün','90 Gün'] }
+  })
+  const [newVade,     setNewVade]    = useState('')
+  const [showVadeMgr, setShowVadeMgr]= useState(false)
+
+  const addVadeOption = () => {
+    const v = newVade.trim()
+    if (!v || vadeOptions.includes(v)) return
+    const updated = [...vadeOptions, v]
+    setVadeOptions(updated)
+    localStorage.setItem('vadeOptions', JSON.stringify(updated))
+    setNewVade('')
+  }
+  const delVadeOption = (v) => {
+    const updated = vadeOptions.filter(x => x !== v)
+    setVadeOptions(updated)
+    localStorage.setItem('vadeOptions', JSON.stringify(updated))
+  }
+
 
   useEffect(() => {
     if (!open || loaded) return
@@ -1302,6 +1323,36 @@ ${gt>0?`<div style="border-top:2px solid #ff6b35;padding-top:14px;margin-top:4px
       </button>
 
       {open && <div style={{marginTop:10}}>
+
+        {/* Vade Seçenekleri Yöneticisi */}
+        <div style={{marginBottom:10}}>
+          <button onClick={()=>setShowVadeMgr(v=>!v)} style={{background:'none',border:'none',color:'var(--text2)',fontSize:11,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",display:'flex',alignItems:'center',gap:4,padding:'2px 0'}}>
+            <span>⚙️</span> Vade Seçenekleri {showVadeMgr ? '▲' : '▼'}
+          </button>
+          {showVadeMgr && (
+            <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 12px',marginTop:6}}>
+              <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:8}}>
+                {vadeOptions.map(v=>(
+                  <div key={v} style={{display:'flex',alignItems:'center',gap:3,background:'rgba(255,255,255,.06)',border:'1px solid var(--border)',borderRadius:6,padding:'3px 8px',fontSize:11}}>
+                    <span style={{color:'var(--text)'}}>{v}</span>
+                    <button onClick={()=>delVadeOption(v)} style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:13,padding:'0 2px',lineHeight:1}}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <input
+                  value={newVade}
+                  onChange={e=>setNewVade(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&addVadeOption()}
+                  placeholder="Yeni vade (örn: 120 Gün)"
+                  style={{flex:1,background:'rgba(255,255,255,.05)',border:'1px solid var(--border)',borderRadius:6,padding:'5px 8px',color:'var(--text)',fontSize:12,fontFamily:"'DM Sans',sans-serif"}}
+                />
+                <button onClick={addVadeOption} style={{padding:'5px 12px',background:'var(--accent)',color:'white',border:'none',borderRadius:6,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>+ Ekle</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {rows.map((row,i) => {
           const it = items[i]||{}
           const qty = parseFloat(it.qty)||0
