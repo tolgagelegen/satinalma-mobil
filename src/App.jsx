@@ -1250,8 +1250,9 @@ function PriceAnalysisSection({ order, items }) {
         return `<tr style="${isBest ? 'background:#f0fff8;font-weight:700;' : ''}">
           <td style="padding:7px 10px;border:1px solid #e5e7eb">${sup.name || `Tedarikçi ${j+1}`} ${isBest ? '<span style="background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px">EN UYGUN ✓</span>' : ''}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right">${price > 0 ? fmtN(price) + ' ₺' : '—'}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#92400e;font-weight:600">${sup.vade||'Peşin'}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center">${it.qty} ${it.unit}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;${isBest?'color:#065f46':''}'">${total > 0 ? fmtN(total) + ' ₺' : '—'}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;${isBest?'color:#065f46':''}">${total > 0 ? fmtN(total) + ' ₺' : '—'}</td>
         </tr>`
       }).join('')
       const bestTotal = bestIdx !== null ? (parseFloat(row.suppliers[bestIdx].unitPrice)||0)*qty : 0
