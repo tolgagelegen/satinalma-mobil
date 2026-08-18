@@ -1383,7 +1383,7 @@ ${gt>0?`<div style="border-top:2px solid #ff6b35;padding-top:14px;margin-top:4px
                         <div>
                           <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Vade</div>
                           <select value={sup.vade||'Peşin'} onChange={e=>upd(i,j,'vade',e.target.value)} style={{...inputStyle,padding:'5px 4px',fontSize:11}}>
-                            {['Peşin','15 Gün','30 Gün','45 Gün','60 Gün','90 Gün'].map(v=><option key={v}>{v}</option>)}
+                            {vadeOptions.map(v=><option key={v}>{v}</option>)}
                           </select>
                         </div>
                         <div style={{flex:1,textAlign:'right'}}>
