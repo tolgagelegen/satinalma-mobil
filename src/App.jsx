@@ -1159,7 +1159,7 @@ function MyOrdersView({ profile }) {
 function PriceAnalysisSection({ order, items }) {
   const [open,       setOpen]      = useState(false)
   const [rows,       setRows]      = useState(() =>
-    items.map(() => ({ suppliers: [{ name:'', unitPrice:'' }, { name:'', unitPrice:'' }], note:'' }))
+    items.map(() => ({ suppliers: [{ name:'', unitPrice:'', vade:'Peşin' }, { name:'', unitPrice:'', vade:'Peşin' }], note:'' }))
   )
   const [saving,     setSaving]    = useState(false)
   const [loaded,     setLoaded]    = useState(false)
@@ -1181,7 +1181,7 @@ function PriceAnalysisSection({ order, items }) {
     ...r, suppliers: r.suppliers.map((s,si) => si!==j ? s : {...s,[field]:val})
   }))
   const addSup = (i) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {
-    ...r, suppliers: [...r.suppliers, {name:'',unitPrice:''}]
+    ...r, suppliers: [...r.suppliers, {name:'',unitPrice:'',vade:'Peşin'}]
   }))
   const delSup = (i,j) => setRows(prev => prev.map((r,ri) => ri!==i ? r : {
     ...r, suppliers: r.suppliers.filter((_,si)=>si!==j)
@@ -1243,6 +1243,7 @@ function PriceAnalysisSection({ order, items }) {
             <thead><tr style="background:#f9fafb">
               <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:left;font-size:10px;text-transform:uppercase;color:#888">Tedarikçi</th>
               <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-size:10px;text-transform:uppercase;color:#888">Birim Fiyat</th>
+              <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-size:10px;text-transform:uppercase;color:#888">Vade</th>
               <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-size:10px;text-transform:uppercase;color:#888">Miktar</th>
               <th style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-size:10px;text-transform:uppercase;color:#888">Toplam</th>
             </tr></thead>
@@ -1328,6 +1329,12 @@ ${gt>0?`<div style="border-top:2px solid #ff6b35;padding-top:14px;margin-top:4px
                           <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Birim Fiyat (₺)</div>
                           <input type="number" value={sup.unitPrice} onChange={e=>upd(i,j,'unitPrice',e.target.value)} placeholder="0.00" style={{...inputStyle,width:'100%',textAlign:'right'}}/>
                         </div>
+                        <div>
+                          <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Vade</div>
+                          <select value={sup.vade||'Peşin'} onChange={e=>upd(i,j,'vade',e.target.value)} style={{...inputStyle,padding:'5px 4px',fontSize:11}}>
+                            {['Peşin','15 Gün','30 Gün','45 Gün','60 Gün','90 Gün'].map(v=><option key={v}>{v}</option>)}
+                          </select>
+                        </div>
                         <div style={{flex:1,textAlign:'right'}}>
                           <div style={{fontSize:10,color:'var(--text2)',marginBottom:2}}>Toplam</div>
                           <div style={{fontSize:13,fontWeight:700,color:isBest?'#22c97a':'var(--text)',padding:'5px 0'}}>{total>0?`${fmt(total)} ₺`:'—'}</div>
@@ -1347,7 +1354,7 @@ ${gt>0?`<div style="border-top:2px solid #ff6b35;padding-top:14px;margin-top:4px
                   <div style={{fontSize:10,color:'#22c97a',fontWeight:700,textTransform:'uppercase',letterSpacing:.8,marginBottom:3}}>✓ En Uygun Fiyat</div>
                   <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{row.suppliers[bestIdx].name||`Tedarikçi ${bestIdx+1}`}</div>
                   <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>
-                    {fmt((parseFloat(row.suppliers[bestIdx].unitPrice)||0)*qty)} ₺ &nbsp;·&nbsp; {fmt(row.suppliers[bestIdx].unitPrice)} ₺/{it.unit}
+                    {fmt((parseFloat(row.suppliers[bestIdx].unitPrice)||0)*qty)} ₺ &nbsp;·&nbsp; {fmt(row.suppliers[bestIdx].unitPrice)} ₺/{it.unit} &nbsp;·&nbsp; <span style={{color:'#f59e0b',fontWeight:600}}>{row.suppliers[bestIdx].vade||'Peşin'}</span>
                   </div>
                 </div>
               )}
