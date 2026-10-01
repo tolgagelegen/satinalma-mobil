@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas'
 
 // ── CONSTANTS ──────────────────────────────────────────────
 const UNITS     = ['Adet','Kg','m²','m³','Ton','Lt','Mt','Paket','Kutu','Koli','Teneke','Torba','Çuval','Rulo','Palet','Kamyon']
-const PROJECTS  = ['FLATS PROJESİ','BOULEVARD PROJESİ','CENTRAL PROJESİ','ALYA PROJESİ','PRİME PROJESİ','DİĞER']
+const PROJECTS  = ['FLATS PROJESİ','BOULEVARD PROJESİ','CENTRAL PROJESİ','ALYA PROJESİ','PRİME PROJESİ','SEMBOL GALERİA','GARDEN BAHÇECİK','DİĞER']
 const URGENCIES = [
   {l:'Normal',   c:'#22c97a', sub:'1 hafta ve üzeri'},
   {l:'Acil',     c:'#f59e0b', sub:'3 gün içinde'},
