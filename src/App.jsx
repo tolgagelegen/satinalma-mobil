@@ -5,7 +5,23 @@ import html2canvas from 'html2canvas'
 
 // ── CONSTANTS ──────────────────────────────────────────────
 const UNITS     = ['Adet','Kg','m²','m³','Ton','Lt','Mt','Paket','Kutu','Koli','Teneke','Torba','Çuval','Rulo','Palet','Kamyon']
-const PROJECTS  = ['FLATS PROJESİ','BOULEVARD PROJESİ','CENTRAL PROJESİ','ALYA PROJESİ','PRİME PROJESİ','SEMBOL GALERİA','GARDEN BAHÇECİK','DİĞER']
+const DEFAULT_PROJECTS = ['FLATS PROJESİ','BOULEVARD PROJESİ','CENTRAL PROJESİ','ALYA PROJESİ','PRİME PROJESİ','SEMBOL GALERİA','GARDEN BAHÇECİK']
+let projectCache = null
+const projectListeners = new Set()
+async function fetchProjects() {
+  const { data, error } = await supabase.from('projects').select('name').order('created_at',{ascending:true})
+  if (!error && data) { projectCache = data.map(d=>d.name); projectListeners.forEach(fn=>fn(projectCache)) }
+}
+// Proje listesi: Supabase'den gelir, tablo yoksa varsayılan listeye düşer. 'DİĞER' her zaman sonda.
+function useProjects() {
+  const [list, setList] = useState(projectCache || DEFAULT_PROJECTS)
+  useEffect(() => {
+    projectListeners.add(setList)
+    fetchProjects()
+    return () => projectListeners.delete(setList)
+  }, [])
+  return [...list, 'DİĞER']
+}
 const URGENCIES = [
   {l:'Normal',   c:'#22c97a', sub:'1 hafta ve üzeri'},
   {l:'Acil',     c:'#f59e0b', sub:'3 gün içinde'},
@@ -477,6 +493,7 @@ function NoProfileView({ onLogout }) {
 
 // ── SHELL ─────────────────────────────────────────────────
 function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPerm, onRequestNotif, themeIdx, onThemeChange }) {
+  useProjects()
   const isAdmin = profile?.role === 'admin'
   const isViewer = profile?.role === 'viewer'
   const tabs = isAdmin
@@ -611,6 +628,7 @@ const EMPTY_ITEM = { desc:'', qty:'', unit:'Adet' }
 const EMPTY_FORM = { project:'FLATS PROJESİ', customProj:'', job:'', urgency:'Normal', urgencyReason:'', note:'' }
 
 function NewOrderView({ profile }) {
+  const PROJECTS = useProjects()
   const [items,    setItems]    = useState([{ ...EMPTY_ITEM }])
   const [f,        setF]        = useState({ ...EMPTY_FORM })
   const [busy,     setBusy]     = useState(false)
@@ -816,6 +834,7 @@ function NewOrderView({ profile }) {
 
 // ── MY DETAIL & EDIT VIEW ─────────────────────────────────
 function MyOrderDetailView({ order, onBack, onSave, onDelete }) {
+  const PROJECTS = useProjects()
   const isEditable = order.status === 'beklemede'
 
   const [items, setItems] = useState(() => parseItems(order.product_description, order.quantity, order.unit))
@@ -1683,6 +1702,39 @@ function UsersView({ profile, reloadProfile }) {
   }
   useEffect(()=>{ load() },[])
 
+  // ── Proje yönetimi (sadece admin) ──
+  const [projList,  setProjList]  = useState([])
+  const [newProj,   setNewProj]   = useState('')
+  const [projBusy,  setProjBusy]  = useState(false)
+  const [projErr,   setProjErr]   = useState('')
+  const [showProj,  setShowProj]  = useState(false)
+
+  const loadProjects = async () => {
+    const { data, error } = await supabase.from('projects').select('*').order('created_at',{ascending:true})
+    if (error) { setProjErr('Proje tablosu bulunamadı. Supabase SQL adımı çalıştırılmalı.'); return }
+    setProjList(data||[]); setProjErr('')
+  }
+  useEffect(()=>{ loadProjects() },[])
+
+  const addProject = async () => {
+    const name = newProj.trim().toLocaleUpperCase('tr-TR')
+    if (!name || name==='DİĞER') return
+    if (projList.some(p=>p.name===name)) { setProjErr('Bu proje zaten var.'); return }
+    setProjBusy(true)
+    const { error } = await supabase.from('projects').insert({ name })
+    if (error) setProjErr('Eklenemedi: '+error.message)
+    else { setNewProj(''); await loadProjects(); await fetchProjects() }
+    setProjBusy(false)
+  }
+  const delProject = async (p) => {
+    if (!window.confirm(`"${p.name}" listeden kaldırılsın mı?\n(Eski siparişler bu projeyle kayıtlı kalır, sadece yeni siparişlerde seçilemez.)`)) return
+    setProjBusy(true)
+    const { error } = await supabase.from('projects').delete().eq('id', p.id)
+    if (error) setProjErr('Silinemedi: '+error.message)
+    else { await loadProjects(); await fetchProjects() }
+    setProjBusy(false)
+  }
+
   const setRole = async (uid, role) => {
     setSaving(uid)
     await supabase.from('profiles').update({role}).eq('id',uid)
@@ -1708,6 +1760,32 @@ function UsersView({ profile, reloadProfile }) {
       <SH title="Kullanıcılar" sub={`${users.length} kullanıcı`}/>
       <div style={{background:'rgba(255,107,53,.08)',border:'1px solid rgba(255,107,53,.2)',borderRadius:10,padding:'10px 13px',marginBottom:14,fontSize:12,color:'var(--accent)',lineHeight:1.6}}>
         💡 Yeni kullanıcı eklemek için Supabase Dashboard → Authentication → Users → <strong>Add user</strong>
+      </div>
+
+      {/* Proje Yönetimi */}
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,marginBottom:14,overflow:'hidden'}}>
+        <button onClick={()=>setShowProj(v=>!v)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',background:'none',border:'none',color:'var(--text)',fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:13,cursor:'pointer'}}>
+          <span>🏗️ Proje Listesi <span style={{fontSize:11,color:'var(--text2)',fontWeight:500}}>({projList.length} proje)</span></span>
+          <span style={{fontSize:10,color:'var(--text2)'}}>{showProj?'▲ Kapat':'▼ Düzenle'}</span>
+        </button>
+        {showProj && (
+          <div style={{padding:'0 14px 14px'}}>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+              {projList.map(p=>(
+                <div key={p.id} style={{display:'flex',alignItems:'center',gap:5,background:'rgba(255,255,255,.06)',border:'1px solid var(--border)',borderRadius:7,padding:'4px 9px',fontSize:12}}>
+                  <span style={{color:'var(--text)'}}>{p.name}</span>
+                  <button onClick={()=>delProject(p)} disabled={projBusy} title="Kaldır" style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:15,padding:'0 2px',lineHeight:1}}>×</button>
+                </div>
+              ))}
+              <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,.03)',border:'1px dashed var(--border)',borderRadius:7,padding:'4px 9px',fontSize:12,color:'var(--text2)'}}>DİĞER (sabit)</div>
+            </div>
+            <div style={{display:'flex',gap:7}}>
+              <input value={newProj} onChange={e=>{setNewProj(e.target.value);setProjErr('')}} onKeyDown={e=>e.key==='Enter'&&addProject()} placeholder="Yeni proje adı" style={{flex:1,fontSize:13}}/>
+              <button onClick={addProject} disabled={projBusy||!newProj.trim()} style={{padding:'8px 14px',background:'var(--accent)',color:'white',border:'none',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",whiteSpace:'nowrap',opacity:(projBusy||!newProj.trim())?.6:1}}>+ Ekle</button>
+            </div>
+            {projErr && <div style={{marginTop:8,fontSize:12,color:'#ef4444'}}>{projErr}</div>}
+          </div>
+        )}
       </div>
       <div style={{display:'flex',flexDirection:'column',gap:7}}>
         {users.map(u=>(
