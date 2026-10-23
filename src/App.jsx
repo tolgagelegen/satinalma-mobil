@@ -77,7 +77,7 @@ const downloadOrderPDF = async (order) => {
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #ff6b35;padding-bottom:14px;margin-bottom:18px">
       <div>
-        <img src="${window.location.origin}/logo.jpg" style="height:48px;object-fit:contain;display:block;margin-bottom:4px"/>
+        <img src="${new URL('./logo.jpg', window.location.href).href}" style="height:48px;object-fit:contain;display:block;margin-bottom:4px"/>
         <div style="font-size:11px;color:#666">Mehmet Kavan Yapı · Saha Sipariş Portalı</div>
       </div>
       <div style="text-align:right">
@@ -210,7 +210,7 @@ const printOrder = (order) => {
 <div class="fold-mark"></div>
 <div class="header">
   <div>
-    <div class="logo"><img src="${window.location.origin}/logo.jpg" alt="Mehmet Kavan Yapı"/>SATINALMA SİSTEMİ<span>Mehmet Kavan Yapı · Saha Sipariş Portalı</span></div>
+    <div class="logo"><img src="${new URL('./logo.jpg', window.location.href).href}" alt="Mehmet Kavan Yapı"/>SATINALMA SİSTEMİ<span>Mehmet Kavan Yapı · Saha Sipariş Portalı</span></div>
   </div>
   <div style="text-align:right">
     <div class="order-no">${order.order_no}<span>${date}</span></div>
@@ -449,7 +449,7 @@ function AuthView() {
     <div className="fade" style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'1.5rem',overflowY:'auto'}}>
       <div style={{textAlign:'center',marginBottom:'2rem'}}>
         <div style={{marginBottom:12}}>
-          <img src="/logo.jpg" alt="Mehmet Kavan Yapı" style={{height:72,objectFit:'contain',borderRadius:12}}/>
+          <img src="./logo.jpg" alt="Mehmet Kavan Yapı" style={{height:72,objectFit:'contain',borderRadius:12}}/>
         </div>
         <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,letterSpacing:'-.4px'}}>SATINALMA SİSTEMİ</h1>
         <p style={{color:'var(--text2)',fontSize:12,marginTop:4}}>Mehmet Kavan Yapı · Saha Sipariş Portalı</p>
@@ -567,7 +567,7 @@ function Shell({ session, profile, tab, setTab, onLogout, reloadProfile, notifPe
       <div style={{background:'var(--bg2)',padding:'10px 16px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <div style={{width:36,height:36,background:'white',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',boxShadow:'0 3px 10px rgba(0,0,0,.2)'}}>
-            <img src="/logo.jpg" alt="logo" style={{width:'100%',height:'100%',objectFit:'contain',padding:3}}/>
+            <img src="./logo.jpg" alt="logo" style={{width:'100%',height:'100%',objectFit:'contain',padding:3}}/>
           </div>
           <div>
             <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:14,letterSpacing:'-.3px',lineHeight:1.1}}>SATINALMA</div>
