@@ -1742,8 +1742,27 @@ function UsersView({ profile, reloadProfile }) {
     load(); setSaving(null)
   }
 
-  const startEdit = (u) => { setEditId(u.id); setEditName(u.name||'') }
+  const startEdit = (u) => { setEditId(u.id); setEditName(u.name||''); setPassId(null) }
   const cancelEdit = () => { setEditId(null); setEditName('') }
+
+  const [passId,   setPassId]   = useState(null)
+  const [newPass,  setNewPass]  = useState('')
+  const [passBusy, setPassBusy] = useState(false)
+  const [passMsg,  setPassMsg]  = useState('')
+
+  const startPass = (u) => { setPassId(u.id); setNewPass(''); setPassMsg(''); setEditId(null) }
+  const cancelPass = () => { setPassId(null); setNewPass(''); setPassMsg('') }
+
+  const savePass = async (uid) => {
+    if (newPass.trim().length < 6) { setPassMsg('Şifre en az 6 karakter olmalı.'); return }
+    setPassBusy(true); setPassMsg('')
+    const { error } = await supabase.rpc('admin_set_user_password', { target_uid: uid, new_pass: newPass.trim() })
+    setPassBusy(false)
+    if (error) { setPassMsg('Hata: ' + error.message); return }
+    setPassMsg('✅ Şifre güncellendi!')
+    setNewPass('')
+    setTimeout(() => { setPassId(null); setPassMsg('') }, 1800)
+  }
 
   const saveName = async (uid) => {
     if (!editName.trim()) return
@@ -1800,6 +1819,12 @@ function UsersView({ profile, reloadProfile }) {
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
                 <button
+                  onClick={()=> passId===u.id ? cancelPass() : startPass(u)}
+                  style={{padding:'5px 9px',background:'rgba(245,158,11,.12)',border:'1px solid rgba(245,158,11,.35)',color:'#f59e0b',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}
+                >
+                  🔑 Şifre
+                </button>
+                <button
                   onClick={()=> editId===u.id ? cancelEdit() : startEdit(u)}
                   style={{padding:'5px 9px',background:'rgba(99,179,237,.1)',border:'1px solid rgba(99,179,237,.3)',color:'#63b3ed',borderRadius:7,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}
                 >
@@ -1819,6 +1844,37 @@ function UsersView({ profile, reloadProfile }) {
                 )}
               </div>
             </div>
+
+            {/* Şifre değiştirme alanı */}
+            {passId === u.id && (
+              <div style={{marginTop:10}}>
+                <div style={{display:'flex',gap:7,alignItems:'center'}}>
+                  <input
+                    type="text"
+                    value={newPass}
+                    onChange={e=>setNewPass(e.target.value)}
+                    placeholder="Yeni şifre (en az 6 karakter)"
+                    onKeyDown={e=>e.key==='Enter'&&savePass(u.id)}
+                    style={{flex:1,fontSize:13}}
+                    autoFocus
+                  />
+                  <button
+                    onClick={()=>savePass(u.id)}
+                    disabled={passBusy||newPass.trim().length<6}
+                    style={{padding:'8px 14px',background:'#f59e0b',color:'white',border:'none',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",whiteSpace:'nowrap',opacity:(passBusy||newPass.trim().length<6)?.6:1}}
+                  >
+                    {passBusy ? '...' : 'Kaydet'}
+                  </button>
+                  <button
+                    onClick={cancelPass}
+                    style={{padding:'8px 10px',background:'var(--border)',color:'var(--text2)',border:'none',borderRadius:8,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}
+                  >
+                    İptal
+                  </button>
+                </div>
+                {passMsg && <div style={{marginTop:6,fontSize:12,color:passMsg.startsWith('✅')?'#22c97a':'#ef4444',fontWeight:600}}>{passMsg}</div>}
+              </div>
+            )}
 
             {/* İsim düzenleme alanı */}
             {editId === u.id && (
